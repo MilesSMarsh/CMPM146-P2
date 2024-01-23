@@ -74,6 +74,8 @@ def ucb(node: MCTSNode, is_opponent: bool):
     Returns:
         The value of the UCB function for the given node
     """
+    return (node.wins / node.visits) + explore_faction * sqrt(log(node.parent.visit)/ node.visits)
+
     pass
 
 def get_best_action(root_node: MCTSNode):
