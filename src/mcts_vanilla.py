@@ -23,7 +23,30 @@ def traverse_nodes(node: MCTSNode, board: Board, state, bot_identity: int):
         state: The state associated with that node
 
     """
-    pass
+    # base case for recursion
+    if(node.untried_actions or not node.child_nodes):
+        return node, state
+    # recursion
+    else:
+
+        # figure out whos turn it is
+        if board.current_player(state) == bot_identity:
+            identity = 0
+        else:
+            identity = 1
+
+        # find the best child node using the ucb function
+        best_value = 0
+        best_node = None
+        for child in node.child_nodes.values():
+            value = ucb(child, identity)
+            if value > best_value:
+                best_value = value
+                best_node = child
+
+        # recursion using the predicted board of the child value
+        state = board.next_state(state, best_node.parent_action)
+        return traverse_nodes(best_node, board, state, bot_identity)
 
 def expand_leaf(node: MCTSNode, board: Board, state):
     """ Adds a new leaf to the tree by creating a new child node for the given node (if it is non-terminal).
@@ -74,7 +97,7 @@ def ucb(node: MCTSNode, is_opponent: bool):
     Returns:
         The value of the UCB function for the given node
     """
-    return (node.wins / node.visits) + explore_faction * sqrt(log(node.parent.visit)/ node.visits)
+    return (node.wins / node.visits) + explore_faction * sqrt(log(node.parent.visits)/ node.visits)
 
     pass
 
