@@ -1,4 +1,3 @@
-
 from mcts_node import MCTSNode
 from p2_t3 import Board
 from random import choice
@@ -25,25 +24,34 @@ def traverse_nodes(node: MCTSNode, board: Board, state, bot_identity: int):
     """
     # base case for recursion
     if(len(node.child_nodes) == 0):
-        #print(len(node.child_nodes))
         return node, state
     # recursion
     else:
-
-        # figure out whos turn it is
-        if board.current_player(state) == bot_identity:
-            identity = 0
-        else:
-            identity = 1
-
         # find the best child node using the ucb function
-        # print("when does this happen?")
-        best_node = get_best_action(node)
+        best_node = None
+        highest_winrate = 0
+
+        if board.current_player(state) == bot_identity:
+            identity = False
+        else:
+            identity = True
+        
+        for child in node.child_nodes.values():
+            child_ucb = ucb(child, identity)
+            if child_ucb >= highest_winrate:
+                highest_winrate = child_ucb
+                best_node = child
+
+        #compare if child is better than parent
+        if(best_node.parent != None and best_node.parent.parent != None):
+            if ucb(best_node, identity) < ucb(best_node.parent, not identity):
+                best_node = best_node.parent
 
         # recursion using the predicted board of the child value
         state = board.next_state(state, best_node.parent_action)
         return traverse_nodes(best_node, board, state, bot_identity)
-        #return the better of the parent or child nodes based on ucb winrate?
+        
+
 
 
 
@@ -101,20 +109,19 @@ def backpropagate(node: MCTSNode|None, won: bool):
         won:    An indicator of whether the bot won or lost the game.
 
     """
-    current_node = node
-    if current_node.parent == None:
-        current_node.visits += 1
-        
-    while current_node.parent != None:
-        current_node.visits += 1
+    if node.parent == None:
+        node.visits += 1
         if won:
-            current_node.wins += 1
-        current_node = current_node.parent
+            node.wins += 1
+    else:
+        node.visits += 1
+        node.wins += 1
+        backpropagate(node.parent, won)
 
 
 
 
-def ucb(node: MCTSNode): #is_opponent: bool
+def ucb(node: MCTSNode, is_opponent: bool):
     """ Calcualtes the UCB value for the given node from the perspective of the bot
 
     Args:
@@ -123,12 +130,12 @@ def ucb(node: MCTSNode): #is_opponent: bool
     Returns:
         The value of the UCB function for the given node
     """
-    # print(node.parent.visits)
-    if node.parent.visits != 0:
-        value = (node.wins / node.visits) + explore_faction * sqrt(log(node.parent.visits)/ node.visits)
-        return value
+    # figure out whos turn it is
+    if is_opponent:
+        return 1 - (node.wins / node.visits) + explore_faction * sqrt(log(node.parent.visits)/ node.visits)
     else:
-        return 0
+        return (node.wins / node.visits) + explore_faction * sqrt(log(node.parent.visits)/ node.visits)
+
 
 
 
@@ -145,12 +152,11 @@ def get_best_action(root_node: MCTSNode):
     best_child = None
     highest_winrate = 0
     for child in root_node.child_nodes.values():
-        if ucb(child) >= highest_winrate:
-            highest_winrate = ucb(child)
+        child_winrate = (child.wins/child.visits)
+        if child_winrate >= highest_winrate:
+            highest_winrate = child_winrate
             best_child = child
-    #print("UCB OF GET BEST ACTION: ", ucb(best_child))
     return best_child
-    #returns possible Nonetype
 
 
 
@@ -178,21 +184,21 @@ def think(board: Board, current_state):
     root_node = MCTSNode(parent=None, parent_action=None, action_list=board.legal_actions(current_state))
 
     for _ in range(num_nodes):
-        # print("iterate")
         state = current_state
         node = root_node
 
-        # Do MCTS - This is all you!
-        # ...
+        # Monte Carlo Tree Search 
         # selection
         node, state = traverse_nodes(node, board, state, bot_identity)
+
         # expansion
         if node.untried_actions:
-            # print("has untried action")
             node, state = expand_leaf(node, board, state)
+
         # simulation
         possible_end_state = rollout(board, state)
         result = is_win(board, possible_end_state, bot_identity)
+
         # backpropagation
         backpropagate(node, result)
     
