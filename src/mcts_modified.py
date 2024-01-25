@@ -3,7 +3,7 @@ from p2_t3 import Board
 from random import choice
 from math import sqrt, log
 
-num_nodes = 1000
+num_nodes = 500
 explore_faction = 2.
 
 def traverse_nodes(node: MCTSNode, board: Board, state, bot_identity: int):
@@ -95,8 +95,15 @@ def rollout(board: Board, state):
     """
     current_state = state
     while (not board.is_ended(current_state)):
-        action = choice(board.legal_actions(current_state))
-        current_state = board.next_state(current_state, action)
+        action_to_use = None
+        
+        for action in board.legal_actions(current_state):
+            if action[2] == 1 and action[3] == 1:
+                action_to_use = action
+
+        if not action_to_use:
+            action_to_use = choice(board.legal_actions(current_state))
+        current_state = board.next_state(current_state, action_to_use)
     return current_state
 
 
