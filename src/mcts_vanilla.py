@@ -3,7 +3,7 @@ from p2_t3 import Board
 from random import choice
 from math import sqrt, log
 
-num_nodes = 100
+num_nodes = 1000
 explore_faction = 2.
 
 def traverse_nodes(node: MCTSNode, board: Board, state, bot_identity: int):
@@ -23,18 +23,23 @@ def traverse_nodes(node: MCTSNode, board: Board, state, bot_identity: int):
 
     """
     # base case for recursion
-    if(len(node.child_nodes) == 0):
+    if board.is_ended(state):
         return node, state
+    
+    # Doesn't have child nodes but has untried actions (Leaf Node)
+    if not node.child_nodes:
+        if node.visits == 0:
+            return node, state
+        else:
+            return expand_leaf(node, board, state)
+            
     # recursion
     else:
-        # find the best child node using the ucb function
-        best_node = None
+        # find the best child node compared to the current node using the ucb function
+        best_node = node
         highest_winrate = 0
 
-        if board.current_player(state) == bot_identity:
-            identity = False
-        else:
-            identity = True
+        identity = (board.current_player(state) == bot_identity)
         
         for child in node.child_nodes.values():
             child_ucb = ucb(child, identity)
@@ -42,15 +47,13 @@ def traverse_nodes(node: MCTSNode, board: Board, state, bot_identity: int):
                 highest_winrate = child_ucb
                 best_node = child
 
-        #compare if child is better than parent
-        if(best_node.parent != None and best_node.parent.parent != None):
-            if ucb(best_node, identity) < ucb(best_node.parent, not identity):
-                best_node = best_node.parent
-
-        # recursion using the predicted board of the child value
-        state = board.next_state(state, best_node.parent_action)
-        return traverse_nodes(best_node, board, state, bot_identity)
+        # if best_node == node:
+        #     return node, state
         
+        # recursion using the predicted board of the child value
+        new_state = board.next_state(state, best_node.parent_action)
+        return traverse_nodes(best_node, board, new_state, identity)
+       
 
 
 
@@ -69,13 +72,11 @@ def expand_leaf(node: MCTSNode, board: Board, state):
         state: The state associated with that node
 
     """
-    # print("Child Node Added")
-    action = choice(node.untried_actions)
-    new_state = board.next_state(state, action)
-    action_list = board.legal_actions(new_state)
-    new_node = MCTSNode(node, action, action_list)
-    node.child_nodes[action] = new_node
-    node.untried_actions.remove(action)
+    for action in node.untried_actions:
+        new_state = board.next_state(state, action)
+        action_list = board.legal_actions(new_state)
+        new_node = MCTSNode(node, action, action_list)
+        node.child_nodes[action] = new_node
     return new_node, new_state
 
 
@@ -109,14 +110,14 @@ def backpropagate(node: MCTSNode|None, won: bool):
         won:    An indicator of whether the bot won or lost the game.
 
     """
-    if node.parent == None:
-        node.visits += 1
-        if won:
-            node.wins += 1
-    else:
-        node.visits += 1
+
+    node.visits += 1
+    if (won):
         node.wins += 1
-        backpropagate(node.parent, won)
+    
+    if (node.parent_action == None):
+        return
+    backpropagate(node.parent, won)
 
 
 
@@ -130,6 +131,9 @@ def ucb(node: MCTSNode, is_opponent: bool):
     Returns:
         The value of the UCB function for the given node
     """
+    if node.visits == 0:
+        return float('inf')
+
     # figure out whos turn it is
     if is_opponent:
         return 1 - (node.wins / node.visits) + explore_faction * sqrt(log(node.parent.visits)/ node.visits)
@@ -188,12 +192,8 @@ def think(board: Board, current_state):
         node = root_node
 
         # Monte Carlo Tree Search 
-        # selection
+        # selection and expansion
         node, state = traverse_nodes(node, board, state, bot_identity)
-
-        # expansion
-        if node.untried_actions:
-            node, state = expand_leaf(node, board, state)
 
         # simulation
         possible_end_state = rollout(board, state)
